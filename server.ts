@@ -8,7 +8,7 @@ const PORT = Number(process.env.PORT || 10000);
 const PUB = path.join(import.meta.dirname, "public");
 const COLS = 40, ROWS = 56, ROUNDS = 3;
 
-type Client = { ws: WebSocket; id: number | null; order: number };
+type Client = { ws: WebSocket; id: number | null; order: number; name: string };
 const clients = new Set<Client>();
 let order = 0;
 let admin: number | null = null;
@@ -31,7 +31,7 @@ const send = (c: Client, m: unknown) => c.ws.readyState === WebSocket.OPEN && c.
 const players = () => [...clients].filter((c) => c.id !== null).sort((a, b) => a.order - b.order);
 
 function lobby() {
-  const ps = players().map((c) => ({ id: c.id, bean: c.id! - 1 }));
+  const ps = players().map((c) => ({ id: c.id, bean: c.id! - 1, name: c.name }));
   for (const c of clients) send(c, { t: "lobby", you: c.id, admin, players: ps, phase: sim ? "playing" : "lobby" });
 }
 
@@ -73,10 +73,10 @@ function tick() {
 function startMatch() {
   const ps = players();
   if (!ps.length || sim) return;
-  const list: { id: number; name: string; ai?: boolean }[] = ps.map((c) => ({ id: c.id!, name: BEANS[c.id! - 1]!.name }));
+  const list: { id: number; name: string; ai?: boolean }[] = ps.map((c) => ({ id: c.id!, name: c.name }));
   if (list.length === 1) {
     const free = BEANS.findIndex((_, i) => i + 1 !== list[0]!.id);
-    list.push({ id: free + 1, name: BEANS[free]!.name + " (AI)", ai: true });
+    list.push({ id: free + 1, name: "AI " + BEANS[free]!.name, ai: true });
   }
   sim = createMatch({ cols: COLS, rows: ROWS, players: list, skill: "novice", rounds: ROUNDS });
   wait = 3 * TICK_HZ;
@@ -92,7 +92,7 @@ function endMatch() {
 }
 
 wss.on("connection", (ws) => {
-  const c: Client = { ws, id: null, order: order++ };
+  const c: Client = { ws, id: null, order: order++, name: "" };
   clients.add(c);
   lobby();
   ws.on("message", (raw) => {
@@ -102,6 +102,7 @@ wss.on("connection", (ws) => {
       const b = Number(m.bean);
       if (!(b >= 0 && b < BEANS.length) || players().some((p) => p.id === b + 1)) { lobby(); return; }
       c.id = b + 1; c.order = order++;
+      c.name = String(m.name || "").replace(/[<>]/g, "").trim().slice(0, 14) || BEANS[b]!.name;
       fixAdmin(); lobby();
     } else if (m.t === "leave" && c.id !== null && !sim) {
       c.id = null; fixAdmin(); lobby();

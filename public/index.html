@@ -30,6 +30,9 @@ body.ingame canvas{display:block}
 button{min-height:52px;min-width:120px;font-size:1.2rem;padding:0 1.4rem;border-radius:12px;border:0;background:#232836;color:#fff}
 .bean-btn{min-width:130px;min-height:90px}
 h1{font-size:3rem;letter-spacing:.08em}
+#nameIn{font-size:1.2rem;padding:.7rem 1rem;border-radius:12px;border:1px solid #333;background:#161a23;color:#fff;width:240px;text-align:center;margin-bottom:.3rem}
+#mute{position:fixed;top:calc(6px + env(safe-area-inset-top));right:8px;z-index:4;min-width:44px;width:44px;height:44px;padding:0;font-size:1.1rem;opacity:.8}
+body.ingame #mute{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;right:auto;transform:translateX(-50%)}
 </style>
 </head>
 <body>
@@ -37,6 +40,8 @@ h1{font-size:3rem;letter-spacing:.08em}
 <div class="connecting" id="connecting">Connecting...</div>
 <canvas id="gameCanvas"></canvas>
 <div id="pad"><button id="tl" aria-label="Turn left">&#9664;</button><button id="tr" aria-label="Turn right">&#9654;</button></div>
+<button id="mute" aria-label="Sound">&#128266;</button>
+<script src="/audio.js"></script>
 <script>
 (() => {
     const BEANS = [
@@ -76,11 +81,12 @@ h1{font-size:3rem;letter-spacing:.08em}
                 lobby = msg;
                 youId = msg.you;
                 adminId = msg.admin;
-                if (youId===null && msg.phase==='lobby') screen='home';
+                if (youId===null && msg.phase==='lobby') screen=(screen==='picker'?'picker':'home');
                 else if (youId===null && msg.phase==='playing') screen='spectator';
                 else screen='lobby';
                 render();
             } else if (msg.t === 'state') {
+                if (window.BWA) BWA.onState(state, msg, youId);
                 state = msg;
                 screen = (youId===null) ? 'spectator' : 'game';
                 render();
@@ -91,7 +97,9 @@ h1{font-size:3rem;letter-spacing:.08em}
     // ---------- Rendering ----------
     function clearApp() { app.innerHTML=''; }
     let loop=false;
+    let nameVal = localStorage.getItem('bw-name') || '';
     function render() {
+        const ae=document.activeElement, refocus = ae && ae.id==='nameIn', caret = refocus ? ae.selectionStart : 0;
         clearApp();
         const g = screen==='game'||(screen==='spectator'&&state);
         if (g && !document.body.classList.contains('ingame')) { document.body.classList.add('ingame'); resizeCanvas(); }
@@ -103,7 +111,9 @@ h1{font-size:3rem;letter-spacing:.08em}
         else if (screen==='lobby') renderLobby();
         else if (screen==='spectator') renderSpectator();
         else if (screen==='game') renderGame();
+        const ni=document.getElementById('nameIn'); if (ni && refocus) { ni.focus(); ni.setSelectionRange(caret,caret); }
     }
+    function label(p){ return (p.name||BEANS[p.bean].name) + ' (' + BEANS[p.bean].name + ')'; }
     function renderHome() {
         const title = document.createElement('h1');
         title.textContent='BEANWARS';
@@ -118,19 +128,23 @@ h1{font-size:3rem;letter-spacing:.08em}
                 dot.className='dot';
                 dot.style.background=BEANS[p.bean].color;
                 item.appendChild(dot);
-                item.appendChild(document.createTextNode(BEANS[p.bean].name));
+                item.appendChild(document.createTextNode(label(p)));
                 list.appendChild(item);
             });
         }
         app.appendChild(list);
         const btn=document.createElement('button');
         btn.textContent='Join';
-        btn.onclick=()=>{ screen='picker'; render(); };
+        btn.onclick=()=>{ if (window.BWA) BWA.welcome(); screen='picker'; render(); };
         app.appendChild(btn);
     }
     function renderPicker() {
         const title=document.createElement('h1');
         title.textContent='Select Your Bean';
+        const ni=document.createElement('input'); ni.id='nameIn'; ni.maxLength=14; ni.placeholder='Your name'; ni.value=nameVal; ni.autocomplete='off';
+        ni.oninput=()=>{ nameVal=ni.value; localStorage.setItem('bw-name',nameVal); };
+        const nl=document.createElement('div'); nl.textContent='Your name'; nl.style.cssText='font-size:.9rem;color:#aaa;margin-top:.5rem';
+        app.appendChild(nl); app.appendChild(ni);
         app.appendChild(title);
         const grid=document.createElement('div');
         grid.style.display='grid';
@@ -153,7 +167,7 @@ h1{font-size:3rem;letter-spacing:.08em}
                 takenLabel.textContent='Taken';
                 btn.appendChild(takenLabel);
             } else {
-                btn.onclick=()=>{ send({t:'join',bean:i}); };
+                btn.onclick=()=>{ if(!nameVal.trim()){ const n=document.getElementById('nameIn'); n.focus(); n.placeholder='Type your name first'; return; } send({t:'join',bean:i,name:nameVal.trim()}); };
             }
             grid.appendChild(btn);
         });
@@ -178,7 +192,7 @@ h1{font-size:3rem;letter-spacing:.08em}
             dot.className='dot';
             dot.style.background=BEANS[p.bean].color;
             item.appendChild(dot);
-            let txt=BEANS[p.bean].name;
+            let txt=label(p);
             if (p.id===adminId) txt+=' (Admin)';
             if (p.id===youId) txt+=' (you)';
             item.appendChild(document.createTextNode(txt));
@@ -235,10 +249,10 @@ h1{font-size:3rem;letter-spacing:.08em}
         overlay.className='overlay';
         if (state.phase==='countdown') overlay.textContent=state.wait;
         else if (state.phase==='round-end') {
-            if (state.winner) overlay.textContent=`${BEANS[state.winner-1].name} wins the round`;
+            if (state.winner) overlay.textContent=`${(state.riders.find(r=>r.id===state.winner)||{name:''}).name} wins the round`;
             else overlay.textContent='Draw';
         } else if (state.phase==='match-end') {
-            if (state.matchWinner) overlay.textContent=`${BEANS[state.matchWinner-1].name} wins Beanwars!`;
+            if (state.matchWinner) overlay.textContent=`${(state.riders.find(r=>r.id===state.matchWinner)||{name:''}).name} wins Beanwars!`;
             else overlay.textContent='Draw';
             const sub=document.createElement('div');
             sub.style.fontSize='1rem';
