@@ -21,7 +21,7 @@ const server = http.createServer((req, res) => {
   if (p === "/") p = "/index.html";
   const f = path.join(PUB, path.normalize(p));
   if (!f.startsWith(PUB) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end("Not found"); return; }
-  const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png" };
+  const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".mp3": "audio/mpeg" };
   res.writeHead(200, { "content-type": types[path.extname(f)] || "application/octet-stream" });
   fs.createReadStream(f).pipe(res);
 });
