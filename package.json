@@ -1,2 +1,1 @@
-{ "name": "beanwars", "private": true, "type": "module", "engines": { "node": ">=22.18" },
-  "scripts": { "start": "node server.ts" }, "dependencies": { "ws": "^8.18.0" } }
+{"name":"beanwars","private":true,"type":"module","engines":{"node":">=22.18"},"scripts":{"start":"node server.ts"},"dependencies":{"redis":"^4.7.1","ws":"^8.18.0"}}

@@ -5,9 +5,11 @@
   const btn = () => document.getElementById('mute');
   function setIcon() { const b = btn(); if (b) b.innerHTML = muted ? '&#128263;' : '&#128266;'; }
   function init() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    if (ctx) { if (ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().catch(() => {}); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
     ctx = new AC();
+    ctx.onstatechange = () => { if (ctx.state !== 'running') setTimeout(init, 300); };
     master = ctx.createGain(); master.gain.value = muted ? 0 : 1; master.connect(ctx.destination);
     sfxBus = ctx.createGain(); sfxBus.gain.value = 0.8; sfxBus.connect(master);
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800;
@@ -60,14 +62,26 @@
   function startMusic() {
     if (!ctx || musicOn) return;
     musicOn = true; nextBar = ctx.currentTime + 0.1;
-    timer = setInterval(() => { while (nextBar < ctx.currentTime + 1.5) { scheduleBar(nextBar, bar++); nextBar += BEAT * 4; } }, 300);
+    timer = setInterval(() => {
+      if (ctx.state !== 'running') { init(); return; }
+      if (nextBar < ctx.currentTime) nextBar = ctx.currentTime + 0.1;
+      while (nextBar < ctx.currentTime + 1.5) { scheduleBar(nextBar, bar++); nextBar += BEAT * 4; } }, 300);
+  }
+  // welcome voice goes through the same audio engine so iPhone doesn't pause the music for it
+  let voiceBuf = null;
+  function playVoice() {
+    if (!ctx) return;
+    const go = () => { const s = ctx.createBufferSource(); s.buffer = voiceBuf; s.connect(master); s.start(); };
+    if (voiceBuf) return go();
+    fetch('/welcome.mp3').then((r) => r.arrayBuffer()).then((a) => new Promise((ok, no) => ctx.decodeAudioData(a, ok, no))).then((b) => { voiceBuf = b; go(); }).catch(() => {});
   }
   // ---- public ----
   window.BWA = {
     welcome() {
       init(); startMusic();
-      if (!muted) { const v = new Audio('/welcome.mp3'); v.volume = 1; v.play().catch(() => {}); }
+      if (!muted) playVoice();
     },
+    get state() { return ctx ? ctx.state : 'none'; },
     turn() { tone(660 + Math.random() * 60, 0.05, 'square', 0.03); },
     onState(prev, s, you) {
       if (!ctx) return;
@@ -84,7 +98,10 @@
       if (s.phase === 'match-end' && prev.phase !== 'match-end') [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.25, 'triangle', 0.08, i * 0.14));
     },
   };
-  document.addEventListener('pointerdown', () => { if (ctx) { init(); startMusic(); } }, true);
+  const wake = () => { if (ctx) { init(); startMusic(); } };
+  ['pointerdown', 'touchend', 'keydown'].forEach((ev) => document.addEventListener(ev, wake, true));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
+  window.addEventListener('pageshow', wake);
   window.addEventListener('DOMContentLoaded', () => {
     setIcon();
     btn().addEventListener('click', (e) => {

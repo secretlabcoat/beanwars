@@ -33,6 +33,20 @@ h1{font-size:3rem;letter-spacing:.08em}
 #nameIn{font-size:1.2rem;padding:.7rem 1rem;border-radius:12px;border:1px solid #333;background:#161a23;color:#fff;width:240px;text-align:center;margin-bottom:.3rem}
 #mute{position:fixed;top:calc(6px + env(safe-area-inset-top));right:8px;z-index:4;min-width:44px;width:44px;height:44px;padding:0;font-size:1.1rem;opacity:.8}
 body.ingame #mute{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;right:auto;transform:translateX(-50%)}
+body.home{background:#05030f url(/title.jpg) center top/100% auto no-repeat}
+body.home #app{justify-content:flex-start}
+.namebox{margin-top:calc(10px + env(safe-area-inset-top));background:rgba(5,3,15,.75);padding:.2rem .8rem .5rem;border-radius:14px;display:flex;flex-direction:column;align-items:center;z-index:2}
+.namelabel{font-size:.9rem;color:#bbb;margin:.3rem 0}
+#nameIn{background:rgba(10,12,20,.85);border:2px solid #4c7bff}
+#nameIn.need{border-color:#ff4d4d}
+.panel{width:100%;padding:1rem 0 calc(1.2rem + env(safe-area-inset-bottom));background:linear-gradient(to bottom,rgba(5,3,15,0),rgba(5,3,15,.92) 25%);display:flex;flex-direction:column;align-items:center}
+.panel .player-list{margin:.4rem 0}
+.inroom{font-size:.95rem;color:#ccc;margin-bottom:.2rem}
+button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c7bff,#ff5fd2);font-weight:700;letter-spacing:.05em}
+.toplist{width:min(92vw,420px);max-height:60vh;overflow:auto;background:#121621;border-radius:12px;padding:.5rem}
+.toplist .row{display:grid;grid-template-columns:2rem 1fr 3.5rem 3.5rem;padding:.35rem .4rem;border-bottom:1px solid #222;text-align:left}
+.toplist .row span:nth-child(n+3){text-align:right}
+.toplist .hd{color:#999;font-size:.85rem}
 </style>
 </head>
 <body>
@@ -64,6 +78,7 @@ body.ingame #mute{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:
     let youId = null;
     let adminId = null;
     let lastTouch = null;
+    let topList = [];
     // ---------- WebSocket ----------
     function connect() {
         const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -81,15 +96,20 @@ body.ingame #mute{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:
                 lobby = msg;
                 youId = msg.you;
                 adminId = msg.admin;
-                if (youId===null && msg.phase==='lobby') screen=(screen==='picker'?'picker':'home');
+                if (youId===null && screen==='top') {}
+                else if (youId===null && msg.phase==='lobby') screen=(screen==='picker'?'picker':'home');
                 else if (youId===null && msg.phase==='playing') screen='spectator';
                 else screen='lobby';
                 render();
             } else if (msg.t === 'state') {
                 if (window.BWA) BWA.onState(state, msg, youId);
                 state = msg;
+                if (youId===null && screen==='top') return;
                 screen = (youId===null) ? 'spectator' : 'game';
                 render();
+            } else if (msg.t === 'top') {
+                topList = msg.list || [];
+                if (screen==='top') render();
             }
         };
     }
@@ -111,40 +131,68 @@ body.ingame #mute{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:
         else if (screen==='lobby') renderLobby();
         else if (screen==='spectator') renderSpectator();
         else if (screen==='game') renderGame();
+        else if (screen==='top') renderTop();
+        document.body.classList.toggle('home', screen==='home');
         const ni=document.getElementById('nameIn'); if (ni && refocus) { ni.focus(); ni.setSelectionRange(caret,caret); }
     }
     function label(p){ return (p.name||BEANS[p.bean].name) + ' (' + BEANS[p.bean].name + ')'; }
+    function nameBox() {
+        const w=document.createElement('div'); w.className='namebox';
+        const nl=document.createElement('div'); nl.textContent='Your name'; nl.className='namelabel';
+        const ni=document.createElement('input'); ni.id='nameIn'; ni.maxLength=14; ni.placeholder='Type your name'; ni.value=nameVal; ni.autocomplete='off'; ni.enterKeyHint='done';
+        ni.oninput=()=>{ nameVal=ni.value; localStorage.setItem('bw-name',nameVal); ni.classList.remove('need'); };
+        w.appendChild(nl); w.appendChild(ni); return w;
+    }
+    function playerList() {
+        const list=document.createElement('div'); list.className='player-list';
+        const ps=(lobby&&lobby.players)||[];
+        const h=document.createElement('div'); h.className='inroom'; h.textContent=ps.length?('In the room ('+ps.length+'/8)'):'No one in the room yet';
+        list.appendChild(h);
+        ps.forEach(p=>{
+            const item=document.createElement('div'); item.className='player-item';
+            const dot=document.createElement('div'); dot.className='dot'; dot.style.background=BEANS[p.bean].color;
+            item.appendChild(dot);
+            let txt=label(p); if (p.id===adminId) txt+=' (Admin)'; if (p.id===youId) txt+=' (you)';
+            item.appendChild(document.createTextNode(txt)); list.appendChild(item);
+        });
+        return list;
+    }
     function renderHome() {
-        const title = document.createElement('h1');
-        title.textContent='BEANWARS';
-        app.appendChild(title);
-        const list = document.createElement('div');
-        list.className='player-list';
-        if (lobby && lobby.players) {
-            lobby.players.forEach(p=>{
-                const item=document.createElement('div');
-                item.className='player-item';
-                const dot=document.createElement('div');
-                dot.className='dot';
-                dot.style.background=BEANS[p.bean].color;
-                item.appendChild(dot);
-                item.appendChild(document.createTextNode(label(p)));
-                list.appendChild(item);
+        app.appendChild(nameBox());
+        const sp=document.createElement('div'); sp.style.flex='1'; app.appendChild(sp);
+        const panel=document.createElement('div'); panel.className='panel';
+        panel.appendChild(playerList());
+        const btn=document.createElement('button'); btn.className='big'; btn.textContent='Join';
+        btn.onclick=()=>{
+            if (!nameVal.trim()) { const n=document.getElementById('nameIn'); n.classList.add('need'); n.placeholder='Type your name first'; n.focus(); return; }
+            if (window.BWA) BWA.welcome(); screen='picker'; render();
+        };
+        const tb=document.createElement('button'); tb.textContent='Top 20'; tb.onclick=()=>{ screen='top'; render(); };
+        panel.appendChild(btn); panel.appendChild(tb);
+        app.appendChild(panel);
+    }
+    function renderTop() {
+        const h=document.createElement('h1'); h.textContent='Top 20'; h.style.fontSize='2.2rem'; app.appendChild(h);
+        const t=document.createElement('div'); t.className='toplist';
+        if (!topList.length) { t.textContent='No finished games yet.'; t.style.textAlign='center'; }
+        else {
+            const hd=document.createElement('div'); hd.className='row hd'; hd.innerHTML='<span>#</span><span>Name</span><span>Wins</span><span>Games</span>'; t.appendChild(hd);
+            topList.forEach((e,i)=>{
+                const row=document.createElement('div'); row.className='row';
+                [String(i+1),e.name,String(e.wins),String(e.games)].forEach(v=>{ const sp=document.createElement('span'); sp.textContent=v; row.appendChild(sp); });
+                t.appendChild(row);
             });
         }
-        app.appendChild(list);
-        const btn=document.createElement('button');
-        btn.textContent='Join';
-        btn.onclick=()=>{ if (window.BWA) BWA.welcome(); screen='picker'; render(); };
-        app.appendChild(btn);
+        app.appendChild(t);
+        const note=document.createElement('div'); note.className='namelabel'; note.textContent='Ranked by match wins. Games against the AI count too.'; app.appendChild(note);
+        const back=document.createElement('button'); back.textContent='Back';
+        back.onclick=()=>{ screen = youId!==null ? 'lobby' : (lobby&&lobby.phase==='playing' ? 'spectator':'home'); if (screen!=='home' && youId!==null && state && lobby.phase==='playing') screen='game'; render(); };
+        app.appendChild(back);
     }
     function renderPicker() {
         const title=document.createElement('h1');
         title.textContent='Select Your Bean';
-        const ni=document.createElement('input'); ni.id='nameIn'; ni.maxLength=14; ni.placeholder='Your name'; ni.value=nameVal; ni.autocomplete='off';
-        ni.oninput=()=>{ nameVal=ni.value; localStorage.setItem('bw-name',nameVal); };
-        const nl=document.createElement('div'); nl.textContent='Your name'; nl.style.cssText='font-size:.9rem;color:#aaa;margin-top:.5rem';
-        app.appendChild(nl); app.appendChild(ni);
+        app.appendChild(nameBox());
         app.appendChild(title);
         const grid=document.createElement('div');
         grid.style.display='grid';
@@ -183,22 +231,7 @@ body.ingame #mute{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:
         title.textContent=`You are ${BEANS[you.bean].name}`;
         title.style.color=BEANS[you.bean].color;
         app.appendChild(title);
-        const list=document.createElement('div');
-        list.className='player-list';
-        lobby.players.forEach(p=>{
-            const item=document.createElement('div');
-            item.className='player-item';
-            const dot=document.createElement('div');
-            dot.className='dot';
-            dot.style.background=BEANS[p.bean].color;
-            item.appendChild(dot);
-            let txt=label(p);
-            if (p.id===adminId) txt+=' (Admin)';
-            if (p.id===youId) txt+=' (you)';
-            item.appendChild(document.createTextNode(txt));
-            list.appendChild(item);
-        });
-        app.appendChild(list);
+        app.appendChild(playerList());
         if (youId===adminId) {
             const startBtn=document.createElement('button');
             startBtn.textContent='Start';
@@ -221,12 +254,14 @@ body.ingame #mute{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:
         leave.style.marginTop='1rem';
         leave.onclick=()=>{ send({t:'leave'}); };
         app.appendChild(leave);
+        const tb=document.createElement('button'); tb.textContent='Top 20'; tb.onclick=()=>{ screen='top'; render(); }; app.appendChild(tb);
     }
     function renderSpectator() {
         const note=document.createElement('div');
         note.textContent='Game in progress. You can join when it ends.';
         note.style.fontSize='1.2rem';
         app.appendChild(note);
+        const tb=document.createElement('button'); tb.textContent='Top 20'; tb.style.pointerEvents='auto'; tb.onclick=()=>{ screen='top'; render(); }; app.appendChild(tb);
     }
     function renderGame() {
         // HUD

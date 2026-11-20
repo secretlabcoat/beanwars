@@ -2,6 +2,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
+import { createClient } from "redis";
 import { BEANS, TICK_HZ, createMatch, resetRound, step, pushTurn, aimHuman, type Sim } from "./sim.ts";
 
 const PORT = Number(process.env.PORT || 10000);
@@ -16,12 +17,51 @@ let sim: Sim | null = null;
 let timer: NodeJS.Timeout | null = null;
 let wait = 0; // ticks to wait (countdown / between rounds)
 
+// ---- top 20 (wins per player name) ----
+type Rec = { name: string; wins: number; games: number };
+let scores: Record<string, Rec> = {};
+const SKEY = "bw:scores";
+const FILE = path.join(import.meta.dirname, "scores.json");
+let kv: ReturnType<typeof createClient> | null = null;
+async function loadScores() {
+  try { if (fs.existsSync(FILE)) scores = JSON.parse(fs.readFileSync(FILE, "utf8")); } catch {}
+  if (process.env.REDIS_URL) {
+    try {
+      kv = createClient({ url: process.env.REDIS_URL });
+      kv.on("error", (e) => console.log("kv error", e.message));
+      await kv.connect();
+      const v = await kv.get(SKEY);
+      if (v) scores = JSON.parse(v);
+    } catch (e: any) { console.log("kv unavailable", e.message); kv = null; }
+  }
+}
+function saveScores() {
+  const v = JSON.stringify(scores);
+  try { fs.writeFileSync(FILE, v); } catch {}
+  if (kv) kv.set(SKEY, v).catch(() => {});
+}
+function top20() {
+  return Object.values(scores).sort((a, b) => b.wins - a.wins || a.games - b.games || a.name.localeCompare(b.name)).slice(0, 20);
+}
+function recordMatch(s: Sim) {
+  for (const r of s.riders) {
+    if (!r.human) continue;
+    const k = r.name.toLowerCase();
+    const e = (scores[k] ||= { name: r.name, wins: 0, games: 0 });
+    e.name = r.name; e.games++;
+    if (s.matchWinner === r.id) e.wins++;
+  }
+  saveScores();
+  const m = JSON.stringify({ t: "top", list: top20() });
+  for (const c of clients) if (c.ws.readyState === WebSocket.OPEN) c.ws.send(m);
+}
+
 const server = http.createServer((req, res) => {
   let p = (req.url || "/").split("?")[0]!;
   if (p === "/") p = "/index.html";
   const f = path.join(PUB, path.normalize(p));
   if (!f.startsWith(PUB) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); res.end("Not found"); return; }
-  const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".mp3": "audio/mpeg" };
+  const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".mp3": "audio/mpeg", ".jpg": "image/jpeg" };
   res.writeHead(200, { "content-type": types[path.extname(f)] || "application/octet-stream" });
   fs.createReadStream(f).pipe(res);
 });
@@ -65,7 +105,7 @@ function tick() {
   } else if (sim.phase === "play") {
     step(sim);
     if (sim.phase === "round-end") wait = 3 * TICK_HZ;
-    if (sim.phase === "match-end") wait = 6 * TICK_HZ;
+    if (sim.phase === "match-end") { wait = 6 * TICK_HZ; recordMatch(sim); }
   }
   broadcastState();
 }
@@ -94,6 +134,7 @@ function endMatch() {
 wss.on("connection", (ws) => {
   const c: Client = { ws, id: null, order: order++, name: "" };
   clients.add(c);
+  send(c, { t: "top", list: top20() });
   lobby();
   ws.on("message", (raw) => {
     let m: any;
@@ -120,4 +161,4 @@ wss.on("connection", (ws) => {
 });
 
 setInterval(() => { for (const c of clients) if (c.ws.readyState === WebSocket.OPEN) c.ws.ping(); }, 25000);
-server.listen(PORT, () => console.log("Beanwars on", PORT));
+loadScores().then(() => server.listen(PORT, () => console.log("Beanwars on", PORT)));
