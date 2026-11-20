@@ -20,6 +20,10 @@ button:disabled{background:#555;cursor:default}
 .hint{position:absolute;top:calc(100% - 2rem);left:50%;transform:translateX(-50%);font-size:0.9rem;color:#aaa;z-index:2}
 canvas{position:fixed;top:0;left:0;width:100%;height:100%;touch-action:none;z-index:0;display:none}
 #app{z-index:1}
+#pad{position:fixed;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));display:none;justify-content:space-between;padding:0 16px;z-index:3;pointer-events:none}
+#pad button{pointer-events:auto;min-width:64px;width:64px;height:52px;padding:0;font-size:1.3rem;opacity:.85;touch-action:none}
+body.ingame.player #pad{display:flex}
+.hint{display:none}
 body.ingame #app{pointer-events:none}
 body.ingame canvas{display:block}
 .connecting{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5rem;color:#aaa;z-index:3}
@@ -32,6 +36,7 @@ h1{font-size:3rem;letter-spacing:.08em}
 <div id="app"></div>
 <div class="connecting" id="connecting">Connecting...</div>
 <canvas id="gameCanvas"></canvas>
+<div id="pad"><button id="tl" aria-label="Turn left">&#9664;</button><button id="tr" aria-label="Turn right">&#9654;</button></div>
 <script>
 (() => {
     const BEANS = [
@@ -91,6 +96,7 @@ h1{font-size:3rem;letter-spacing:.08em}
         const g = screen==='game'||(screen==='spectator'&&state);
         if (g && !document.body.classList.contains('ingame')) { document.body.classList.add('ingame'); resizeCanvas(); }
         if (!g) document.body.classList.remove('ingame');
+        document.body.classList.toggle('player', screen==='game');
         if (g && !loop) { loop=true; requestAnimationFrame(draw); }
         if (screen==='home') renderHome();
         else if (screen==='picker') renderPicker();
@@ -188,7 +194,7 @@ h1{font-size:3rem;letter-spacing:.08em}
             const note=document.createElement('div');
             note.style.fontSize='0.9rem';
             note.style.marginTop='0.3rem';
-            note.textContent='Start now or wait for more players';
+            note.textContent='Start now or wait for more players. If you start alone, an AI bean joins.';
             app.appendChild(note);
         } else {
             const wait=document.createElement('div');
@@ -217,7 +223,7 @@ h1{font-size:3rem;letter-spacing:.08em}
         topBar.appendChild(roundInfo);
         state.riders.forEach(r=>{
             const span=document.createElement('span');
-            span.textContent=`${BEANS[r.id-1].name}:${r.score}`;
+            span.textContent=`${r.name}:${r.score}`;
             span.style.color=BEANS[r.id-1].color;
             if (!r.alive) span.style.opacity='0.4';
             if (r.id===youId) span.textContent+=` (you)`;
@@ -262,7 +268,7 @@ h1{font-size:3rem;letter-spacing:.08em}
     function draw() {
         if (!document.body.classList.contains('ingame') || !state) { loop=false; return; }
         const {cols,rows,grid,minX,minY,maxX,maxY} = state;
-        const W=window.innerWidth, H=window.innerHeight, top=70, bot=40;
+        const W=window.innerWidth, H=window.innerHeight, top=70, bot=84;
         const cell=Math.min(W/cols,(H-top-bot)/rows), cellW=cell, cellH=cell;
         ctx.save();
         ctx.fillStyle = '#0b0d12';
@@ -333,6 +339,7 @@ h1{font-size:3rem;letter-spacing:.08em}
         return `rgb(${r},${g},${b})`;
     }
     // ---------- Input ----------
+    for (const [id,d] of [['tl',-1],['tr',1]]) document.getElementById(id).addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();send({t:'turn',d});});
     function send(msg){ if(wsOpen) ws.send(JSON.stringify(msg)); }
     // Keyboard
     window.addEventListener('keydown',e=>{

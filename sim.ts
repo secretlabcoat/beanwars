@@ -79,7 +79,7 @@ export function chooseGrid(w: number, h: number): { cols: number; rows: number }
 export function createMatch(opts: {
   cols: number;
   rows: number;
-  players: { id: number; name: string }[];
+  players: { id: number; name: string; ai?: boolean }[];
   skill: Skill;
   rounds: number;
   demo?: boolean;
@@ -90,7 +90,7 @@ export function createMatch(opts: {
     riders.push({
       id: p.id,
       name: p.name,
-      human: true,
+      human: !p.ai,
       skill: opts.skill,
       x: 0,
       y: 0,

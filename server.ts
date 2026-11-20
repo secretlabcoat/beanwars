@@ -73,7 +73,12 @@ function tick() {
 function startMatch() {
   const ps = players();
   if (!ps.length || sim) return;
-  sim = createMatch({ cols: COLS, rows: ROWS, players: ps.map((c) => ({ id: c.id!, name: BEANS[c.id! - 1]!.name })), skill: "novice", rounds: ROUNDS });
+  const list: { id: number; name: string; ai?: boolean }[] = ps.map((c) => ({ id: c.id!, name: BEANS[c.id! - 1]!.name }));
+  if (list.length === 1) {
+    const free = BEANS.findIndex((_, i) => i + 1 !== list[0]!.id);
+    list.push({ id: free + 1, name: BEANS[free]!.name + " (AI)", ai: true });
+  }
+  sim = createMatch({ cols: COLS, rows: ROWS, players: list, skill: "novice", rounds: ROUNDS });
   wait = 3 * TICK_HZ;
   timer = setInterval(tick, 1000 / TICK_HZ);
   lobby();
