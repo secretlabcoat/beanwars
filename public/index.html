@@ -28,7 +28,8 @@ body.ingame #app{pointer-events:none}
 body.ingame canvas{display:block}
 .connecting{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5rem;color:#aaa;z-index:3}
 button{min-height:52px;min-width:120px;font-size:1.2rem;padding:0 1.4rem;border-radius:12px;border:0;background:#232836;color:#fff}
-.bean-btn{min-width:130px;min-height:90px}
+.bean-btn{min-width:130px;min-height:100px}
+.beanimg{object-fit:contain;display:block}
 h1{font-size:3rem;letter-spacing:.08em}
 #nameIn{font-size:1.2rem;padding:.7rem 1rem;border-radius:12px;border:1px solid #333;background:#161a23;color:#fff;width:240px;text-align:center;margin-bottom:.3rem}
 #mute{position:fixed;top:calc(6px + env(safe-area-inset-top));right:8px;z-index:4;min-width:44px;width:44px;height:44px;padding:0;font-size:1.1rem;opacity:.8}
@@ -79,6 +80,8 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
     let adminId = null;
     let lastTouch = null;
     let topList = [];
+    const BIMG = BEANS.map(b=>{ const i=new Image(); i.src='/beans/'+b.name.toLowerCase()+'.png'; return i; });
+    function beanImg(i,size){ const im=document.createElement('img'); im.src='/beans/'+BEANS[i].name.toLowerCase()+'.png'; im.alt=BEANS[i].name; im.className='beanimg'; im.style.width=size+'px'; im.style.height=size+'px'; return im; }
     // ---------- WebSocket ----------
     function connect() {
         const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -150,7 +153,7 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
         list.appendChild(h);
         ps.forEach(p=>{
             const item=document.createElement('div'); item.className='player-item';
-            const dot=document.createElement('div'); dot.className='dot'; dot.style.background=BEANS[p.bean].color;
+            const dot=beanImg(p.bean,26); dot.style.marginRight='.5rem'; dot.style.filter='drop-shadow(0 0 4px '+BEANS[p.bean].color+')';
             item.appendChild(dot);
             let txt=label(p); if (p.id===adminId) txt+=' (Admin)'; if (p.id===youId) txt+=' (you)';
             item.appendChild(document.createTextNode(txt)); list.appendChild(item);
@@ -203,9 +206,9 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
             const btn=document.createElement('button');
             btn.className='bean-btn';
             btn.disabled=taken;
-            const shape=document.createElement('div');
-            shape.className='bean-shape';
-            shape.style.background=taken?'#555':b.color;
+            const shape=beanImg(i,64);
+            if (taken) shape.style.filter='grayscale(1) brightness(.5)';
+            btn.style.borderBottom='4px solid '+(taken?'#555':b.color);
             btn.appendChild(shape);
             btn.appendChild(document.createTextNode(b.name));
             if (taken) {
@@ -365,17 +368,15 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
             if (!r.alive) return;
             const cx = (r.x+0.5)*cellW;
             const cy = (r.y+0.5)*cellH;
-            const w = cellW*0.8;
-            const h = cellH*0.6;
+            const sz = cellW*2.8, col = BEANS[r.id-1].color, im = BIMG[r.id-1];
             ctx.save();
             ctx.translate(cx,cy);
-            ctx.rotate(r.dir*Math.PI/2);
-            ctx.fillStyle = BEANS[r.id-1].color;
-            ctx.shadowColor = BEANS[r.id-1].color;
-            ctx.shadowBlur = 10;
-            ctx.beginPath();
-            ctx.ellipse(0,0,w/2,h/2,0,0,2*Math.PI);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(0,0,sz*0.42,0,2*Math.PI);
+            ctx.fillStyle = col+'40'; ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.rotate(r.dir*Math.PI/2 + Math.PI/2);
+            if (im.complete && im.naturalWidth) ctx.drawImage(im,-sz/2,-sz/2,sz,sz);
+            else { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(0,0,cellW*0.4,cellH*0.3,0,0,2*Math.PI); ctx.fill(); }
             ctx.restore();
         });
         ctx.restore();
