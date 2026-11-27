@@ -18,7 +18,7 @@ let timer: NodeJS.Timeout | null = null;
 let wait = 0; // ticks to wait (countdown / between rounds)
 
 // ---- top 20 (wins per player name) ----
-type Rec = { name: string; wins: number; games: number };
+type Rec = { name: string; wins: number; games: number; bean?: number };
 let scores: Record<string, Rec> = {};
 const SKEY = "bw:scores";
 const FILE = path.join(import.meta.dirname, "scores.json");
@@ -48,7 +48,7 @@ function recordMatch(s: Sim) {
     if (!r.human) continue;
     const k = r.name.toLowerCase();
     const e = (scores[k] ||= { name: r.name, wins: 0, games: 0 });
-    e.name = r.name; e.games++;
+    e.name = r.name; e.games++; e.bean = r.id - 1;
     if (s.matchWinner === r.id) e.wins++;
   }
   saveScores();
@@ -115,8 +115,10 @@ function startMatch() {
   if (!ps.length || sim) return;
   const list: { id: number; name: string; ai?: boolean }[] = ps.map((c) => ({ id: c.id!, name: c.name }));
   if (list.length === 1) {
-    const free = BEANS.findIndex((_, i) => i + 1 !== list[0]!.id);
-    list.push({ id: free + 1, name: "AI " + BEANS[free]!.name, ai: true });
+    const taken = new Set(list.map((p) => p.id));
+    const free = BEANS.map((_, i) => i).filter((i) => !taken.has(i + 1));
+    const pick = free[Math.floor(Math.random() * free.length)] ?? 0;
+    list.push({ id: pick + 1, name: "AI " + BEANS[pick]!.name, ai: true });
   }
   sim = createMatch({ cols: COLS, rows: ROWS, players: list, skill: "expert", rounds: ROUNDS });
   wait = 3 * TICK_HZ;

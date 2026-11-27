@@ -8,8 +8,6 @@
 html,body{margin:0;padding:0;height:100%;background:#0b0d12;color:#fff;font-family:system-ui,sans-serif;overflow:hidden}
 #app{position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
 h1{font-size:3rem;margin:0.5rem}
-button{min-height:52px;padding:0 1rem;font-size:1.2rem;border:none;border-radius:8px;background:#222;color:#fff;margin:0.5rem;cursor:pointer}
-button:disabled{background:#555;cursor:default}
 .bean-btn{display:flex;flex-direction:column;align-items:center;justify-content:center}
 .bean-shape{width:80px;height:40px;border-radius:40px/20px;margin-bottom:0.3rem}
 .player-list{display:flex;flex-direction:column;align-items:center;margin:1rem 0}
@@ -21,18 +19,21 @@ button:disabled{background:#555;cursor:default}
 canvas{position:fixed;top:0;left:0;width:100%;height:100%;touch-action:none;z-index:0;display:none}
 #app{z-index:1}
 #pad{position:fixed;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));display:none;justify-content:space-between;padding:0 16px;z-index:3;pointer-events:none}
-#pad button{pointer-events:auto;min-width:64px;width:64px;height:52px;padding:0;font-size:1.3rem;opacity:.85;touch-action:none}
+#pad button{pointer-events:auto;min-width:64px;width:64px;min-height:52px;height:52px;padding:0;font-size:1.3rem;touch-action:none;margin:0}
 body.ingame.player #pad{display:flex}
 .hint{display:none}
 body.ingame #app{pointer-events:none}
 body.ingame canvas{display:block}
 .connecting{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5rem;color:#aaa;z-index:3}
-button{min-height:52px;min-width:120px;font-size:1.2rem;padding:0 1.4rem;border-radius:12px;border:0;background:#232836;color:#fff}
-.bean-btn{min-width:130px;min-height:100px}
+button{min-height:52px;min-width:120px;font-size:1.2rem;padding:0 1.4rem;margin:0.5rem;border-radius:14px;border:1px solid rgba(120,170,255,.35);background:linear-gradient(180deg,#2e3a5e,#1a2034);color:#fff;cursor:pointer;box-shadow:0 0 14px rgba(76,123,255,.28),inset 0 1px 0 rgba(255,255,255,.14);transition:transform .1s,filter .1s,box-shadow .1s}
+button:hover{filter:brightness(1.12);box-shadow:0 0 20px rgba(76,123,255,.5)}
+button:active{transform:scale(.96);filter:brightness(1.22)}
+button:disabled{background:#2a2e38;border-color:#444;color:#888;box-shadow:none;filter:none;transform:none;cursor:default}
+.bean-btn{min-width:130px;min-height:100px;background:linear-gradient(180deg,#283250,#141824)}
 .beanimg{object-fit:contain;display:block}
 h1{font-size:3rem;letter-spacing:.08em}
 #nameIn{font-size:1.2rem;padding:.7rem 1rem;border-radius:12px;border:1px solid #333;background:#161a23;color:#fff;width:240px;text-align:center;margin-bottom:.3rem}
-#mute{position:fixed;top:calc(6px + env(safe-area-inset-top));right:8px;z-index:4;min-width:44px;width:44px;height:44px;padding:0;font-size:1.1rem;opacity:.8}
+#mute{position:fixed;top:calc(6px + env(safe-area-inset-top));right:8px;z-index:4;min-width:44px;width:44px;min-height:44px;height:44px;padding:0;font-size:1.1rem;margin:0}
 body.ingame #mute{top:auto;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;right:auto;transform:translateX(-50%)}
 body.home{background:#05030f url(/title.jpg) center top/100% auto no-repeat}
 body.home #app{justify-content:flex-start}
@@ -43,11 +44,34 @@ body.home #app{justify-content:flex-start}
 .panel{width:100%;padding:1rem 0 calc(1.2rem + env(safe-area-inset-bottom));background:linear-gradient(to bottom,rgba(5,3,15,0),rgba(5,3,15,.92) 25%);display:flex;flex-direction:column;align-items:center}
 .panel .player-list{margin:.4rem 0}
 .inroom{font-size:.95rem;color:#ccc;margin-bottom:.2rem}
-button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c7bff,#ff5fd2);font-weight:700;letter-spacing:.05em}
-.toplist{width:min(92vw,420px);max-height:60vh;overflow:auto;background:#121621;border-radius:12px;padding:.5rem}
-.toplist .row{display:grid;grid-template-columns:2rem 1fr 3.5rem 3.5rem;padding:.35rem .4rem;border-bottom:1px solid #222;text-align:left}
-.toplist .row span:nth-child(n+3){text-align:right}
-.toplist .hd{color:#999;font-size:.85rem}
+button.big{min-width:200px;font-size:1.5rem;font-weight:700;letter-spacing:.05em;border:0;background:linear-gradient(90deg,#4c7bff,#ff5fd2);box-shadow:0 0 22px rgba(255,95,210,.45)}
+.toplist{width:min(92vw,420px);max-height:46vh;overflow:auto;background:rgba(10,14,28,.88);border:1px solid rgba(76,123,255,.35);border-radius:14px;padding:.4rem;box-shadow:0 0 24px rgba(76,123,255,.2)}
+.toplist .row{display:grid;grid-template-columns:1.6rem 26px 1fr 2.6rem 2.7rem 2.6rem;align-items:center;gap:4px;padding:.38rem .35rem;border-bottom:1px solid rgba(255,255,255,.06);text-align:left;font-size:.9rem;animation:rise .4s ease both}
+.toplist .row span:nth-child(n+4){text-align:right}
+.toplist .hd{color:#9ab;font-size:.78rem;animation:none}
+.toplist .r1{background:linear-gradient(90deg,rgba(240,193,78,.22),transparent);box-shadow:inset 0 0 12px rgba(240,193,78,.15)}
+.toplist .r2{background:linear-gradient(90deg,rgba(180,200,220,.16),transparent)}
+.toplist .r3{background:linear-gradient(90deg,rgba(200,135,90,.18),transparent)}
+.toptitle{font-size:2rem;margin:.4rem 0 .2rem;letter-spacing:.12em;text-shadow:0 0 16px #4c7bff,0 0 28px #ff5fd2}
+body.top{background:#05030f}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:.4rem;width:min(92vw,420px);margin:.2rem 0 .6rem}
+.podium .spot{flex:1;background:rgba(12,16,32,.9);border:1px solid rgba(120,170,255,.3);border-radius:12px;padding:.4rem .2rem .5rem;animation:rise .5s ease both}
+.podium .s1{order:2;min-height:8.2rem;border-color:#f0c14e;box-shadow:0 0 18px rgba(240,193,78,.35)}
+.podium .s2{order:1;min-height:6.4rem;border-color:#c5d0e0;animation-delay:.08s}
+.podium .s3{order:3;min-height:5.6rem;border-color:#c8875a;animation-delay:.16s}
+.podium .place{font-size:.8rem;color:#ccc}
+.podium .pname{font-size:.9rem;font-weight:700;margin-top:.15rem;word-break:break-word}
+.podium .pstat{font-size:.8rem;color:#bcd}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes beanPop{0%{transform:scale(.2) rotate(-10deg);opacity:0}60%{transform:scale(1.16) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+.wincard{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(92vw,400px);max-height:82vh;overflow:auto;z-index:5;background:rgba(8,10,22,.92);border:1px solid rgba(255,95,210,.45);border-radius:18px;padding:.8rem .8rem 1rem;box-shadow:0 0 36px rgba(76,123,255,.35);pointer-events:auto;display:flex;flex-direction:column;align-items:center}
+.wincard .winbean{width:160px;height:160px;filter:drop-shadow(0 0 18px #ff5fd2);animation:beanPop .7s ease both}
+.wintitle{font-size:1.55rem;font-weight:800;margin:.35rem 0 .5rem;letter-spacing:.03em;background:linear-gradient(90deg,#4c7bff,#ff5fd2);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none}
+.recipe{width:100%;text-align:left;background:rgba(16,20,36,.9);border:1px solid rgba(76,123,255,.3);border-radius:12px;padding:.65rem .7rem;font-size:.92rem;line-height:1.35;margin-bottom:.4rem}
+.recipe .rtitle{font-weight:700;color:#f0c14e;margin-bottom:.3rem;font-size:1.05rem}
+body.ingame #app .wincard,body.ingame #app .wincard *{pointer-events:auto}
+body.won #pad,body.won.ingame.player #pad{display:none!important}
+body.won #mute,body.won.ingame #mute{display:none!important}
 </style>
 </head>
 <body>
@@ -57,6 +81,7 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
 <div id="pad"><button id="tl" aria-label="Turn left">&#9664;</button><button id="tr" aria-label="Turn right">&#9654;</button></div>
 <button id="mute" aria-label="Sound">&#128266;</button>
 <script src="/audio.js"></script>
+<script src="/recipes.js"></script>
 <script>
 (() => {
     const BEANS = [
@@ -80,6 +105,7 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
     let adminId = null;
     let lastTouch = null;
     let topList = [];
+    let winHold=false, winDismissed=false, winRecipe=null, winBean=0;
     const BIMG = BEANS.map(b=>{ const i=new Image(); i.src='/beans/'+b.name.toLowerCase()+'.png'; return i; });
     function beanImg(i,size){ const im=document.createElement('img'); im.src='/beans/'+BEANS[i].name.toLowerCase()+'.png'; im.alt=BEANS[i].name; im.className='beanimg'; im.style.width=size+'px'; im.style.height=size+'px'; return im; }
     // ---------- WebSocket ----------
@@ -99,12 +125,22 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
                 lobby = msg;
                 youId = msg.you;
                 adminId = msg.admin;
+                if (winHold) return;
                 if (youId===null && screen==='top') {}
                 else if (youId===null && msg.phase==='lobby') screen=(screen==='picker'?'picker':'home');
                 else if (youId===null && msg.phase==='playing') screen='spectator';
                 else screen='lobby';
                 render();
             } else if (msg.t === 'state') {
+                if (winDismissed && msg.phase==='match-end') { state=msg; return; }
+                if (msg.phase==='match-end' && (!state || state.phase!=='match-end') && msg.matchWinner===youId) {
+                    winHold=true; winDismissed=false;
+                    winBean=msg.matchWinner-1;
+                    const key=BEANS[winBean] && BEANS[winBean].name.toLowerCase();
+                    const list=(window.BW_RECIPES && key && BW_RECIPES[key]) || [];
+                    winRecipe=list.length ? list[Math.floor(Math.random()*list.length)] : null;
+                    if (window.BWA) BWA.great();
+                }
                 if (state && state.riders) {
                     for (const r of msg.riders) {
                         const pr = state.riders.find(x=>x.id===r.id);
@@ -132,6 +168,9 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
     let stars=null, sparks=[], shake=0;
     let nameVal = localStorage.getItem('bw-name') || '';
     function render() {
+        document.body.classList.toggle('won', winHold);
+        document.body.classList.toggle('top', screen==='top');
+        if (winHold && app.querySelector('.wincard')) return;
         const ae=document.activeElement, refocus = ae && ae.id==='nameIn', caret = refocus ? ae.selectionStart : 0;
         clearApp();
         const g = screen==='game'||(screen==='spectator'&&state);
@@ -185,14 +224,42 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
         app.appendChild(panel);
     }
     function renderTop() {
-        const h=document.createElement('h1'); h.textContent='Top 20'; h.style.fontSize='2.2rem'; app.appendChild(h);
+        const h=document.createElement('h1'); h.className='toptitle'; h.textContent='Top 20'; app.appendChild(h);
+        if (topList.length) {
+            const pod=document.createElement('div'); pod.className='podium';
+            const places=topList.slice(0,3);
+            // render gold in the middle: add in 2,1,3 visual order via CSS order
+            const order=[places[1],places[0],places[2]];
+            const labels=[2,1,3];
+            order.forEach((e,j)=>{
+                if (!e) return;
+                const rank=labels[j];
+                const spot=document.createElement('div'); spot.className='spot s'+rank;
+                const pl=document.createElement('div'); pl.className='place'; pl.textContent=['','1st','2nd','3rd'][rank];
+                if (e.bean>=0 && e.bean<BEANS.length) { const im=beanImg(e.bean, rank===1?64:48); im.style.margin='0 auto .15rem'; im.style.filter='drop-shadow(0 0 6px '+BEANS[e.bean].color+')'; spot.appendChild(im); }
+                const nm=document.createElement('div'); nm.className='pname'; nm.textContent=e.name;
+                const st=document.createElement('div'); st.className='pstat'; st.textContent=e.wins+' win'+(e.wins===1?'':'s');
+                spot.appendChild(pl); spot.appendChild(nm); spot.appendChild(st);
+                pod.appendChild(spot);
+            });
+            app.appendChild(pod);
+        }
         const t=document.createElement('div'); t.className='toplist';
-        if (!topList.length) { t.textContent='No finished games yet.'; t.style.textAlign='center'; }
+        if (!topList.length) { t.textContent='No finished games yet.'; t.style.textAlign='center'; t.style.padding='1rem'; }
         else {
-            const hd=document.createElement('div'); hd.className='row hd'; hd.innerHTML='<span>#</span><span>Name</span><span>Wins</span><span>Games</span>'; t.appendChild(hd);
+            const hd=document.createElement('div'); hd.className='row hd';
+            ['#','','Name','Wins','Games','Win %'].forEach(v=>{ const sp=document.createElement('span'); sp.textContent=v; hd.appendChild(sp); });
+            t.appendChild(hd);
             topList.forEach((e,i)=>{
-                const row=document.createElement('div'); row.className='row';
-                [String(i+1),e.name,String(e.wins),String(e.games)].forEach(v=>{ const sp=document.createElement('span'); sp.textContent=v; row.appendChild(sp); });
+                const row=document.createElement('div'); row.className='row'+(i<3?' r'+(i+1):'');
+                row.style.animationDelay=(i*0.04)+'s';
+                const rank=document.createElement('span'); rank.textContent=String(i+1); row.appendChild(rank);
+                const ic=document.createElement('span');
+                if (e.bean>=0 && e.bean<BEANS.length) { const im=beanImg(e.bean,22); im.style.filter='drop-shadow(0 0 4px '+BEANS[e.bean].color+')'; ic.appendChild(im); }
+                row.appendChild(ic);
+                const nm=document.createElement('span'); nm.textContent=e.name; row.appendChild(nm);
+                const wr=e.games?Math.round(e.wins/e.games*100)+'%':'0%';
+                [String(e.wins),String(e.games),wr].forEach(v=>{ const sp=document.createElement('span'); sp.textContent=v; row.appendChild(sp); });
                 t.appendChild(row);
             });
         }
@@ -247,8 +314,8 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
         app.appendChild(playerList());
         if (youId===adminId) {
             const startBtn=document.createElement('button');
+            startBtn.className='big';
             startBtn.textContent='Start';
-            startBtn.style.fontSize='1.4rem';
             startBtn.onclick=()=>{ send({t:'start'}); };
             app.appendChild(startBtn);
             const note=document.createElement('div');
@@ -300,6 +367,25 @@ button.big{min-width:200px;font-size:1.5rem;background:linear-gradient(90deg,#4c
             if (state.winner) overlay.textContent=`${(state.riders.find(r=>r.id===state.winner)||{name:''}).name} wins the round`;
             else overlay.textContent='Draw';
         } else if (state.phase==='match-end') {
+            if (winHold && state.matchWinner===youId) {
+                const card=document.createElement('div'); card.className='wincard';
+                const im=beanImg(winBean,160); im.className='beanimg winbean';
+                im.style.filter='drop-shadow(0 0 18px '+(BEANS[winBean]||BEANS[0]).color+')';
+                const title=document.createElement('div'); title.className='wintitle'; title.textContent="You've Bean Great!";
+                card.appendChild(im); card.appendChild(title);
+                if (winRecipe) {
+                    const box=document.createElement('div'); box.className='recipe';
+                    const rt=document.createElement('div'); rt.className='rtitle'; rt.textContent=winRecipe.title;
+                    box.appendChild(rt);
+                    (winRecipe.lines||[]).forEach(line=>{ const p=document.createElement('div'); p.textContent=line; box.appendChild(p); });
+                    card.appendChild(box);
+                }
+                const go=document.createElement('button'); go.className='big'; go.textContent='Continue';
+                go.onclick=()=>{ winHold=false; winDismissed=true; winRecipe=null; document.body.classList.remove('won','ingame'); screen = youId!==null ? 'lobby' : 'home'; render(); };
+                card.appendChild(go);
+                app.appendChild(card);
+                return;
+            }
             if (state.matchWinner) overlay.textContent=`${(state.riders.find(r=>r.id===state.matchWinner)||{name:''}).name} wins Beanwars!`;
             else overlay.textContent='Draw';
             const sub=document.createElement('div');

@@ -83,19 +83,23 @@
       if (nextBar < ctx.currentTime) nextBar = ctx.currentTime + 0.1;
       while (nextBar < ctx.currentTime + 1.5) { scheduleBar(nextBar, bar++); nextBar += BEAT * 4; } }, 300);
   }
-  // welcome voice goes through the same audio engine so iPhone doesn't pause the music for it
-  let voiceBuf = null;
-  function playVoice() {
+  // voices go through the same audio engine so iPhone doesn't pause the music for them
+  const voiceBufs = {};
+  function playVoice(url = '/welcome.mp3') {
     if (!ctx) return;
-    const go = () => { const s = ctx.createBufferSource(); s.buffer = voiceBuf; s.connect(master); s.start(); };
-    if (voiceBuf) return go();
-    fetch('/welcome.mp3').then((r) => r.arrayBuffer()).then((a) => new Promise((ok, no) => ctx.decodeAudioData(a, ok, no))).then((b) => { voiceBuf = b; go(); }).catch(() => {});
+    const go = (b) => { const s = ctx.createBufferSource(); s.buffer = b; s.connect(master); s.start(); };
+    if (voiceBufs[url]) return go(voiceBufs[url]);
+    fetch(url).then((r) => r.arrayBuffer()).then((a) => new Promise((ok, no) => ctx.decodeAudioData(a, ok, no))).then((b) => { voiceBufs[url] = b; go(b); }).catch(() => {});
   }
   // ---- public ----
   window.BWA = {
     welcome() {
       init(); startMusic();
-      if (!muted) playVoice();
+      if (!muted) playVoice('/welcome.mp3');
+    },
+    great() {
+      init(); startMusic();
+      if (!muted) playVoice('/great.mp3');
     },
     get state() { return ctx ? ctx.state : 'none'; },
     turn() { tone(660 + Math.random() * 60, 0.05, 'square', 0.03); },
