@@ -1,6 +1,6 @@
 // Beanwars sound: effects, procedural lofi music, welcome voice.
 (() => {
-  let ctx = null, master = null, sfxBus = null, musicBus = null, musicOn = false, nextBar = 0, bar = 0, timer = null;
+  let ctx = null, master = null, sfxBus = null, musicBus = null, musicOn = false, nextBar = 0, bar = 0, timer = null, ambOn = false;
   let muted = localStorage.getItem('bw-muted') === '1';
   const btn = () => document.getElementById('mute');
   function setIcon() { const b = btn(); if (b) b.innerHTML = muted ? '&#128263;' : '&#128266;'; }
@@ -59,8 +59,24 @@
     for (let k = 0; k < 8; k++) noise(0.04, 0.06, 'highpass', 7000, at + k * BEAT / 2 + (k % 2 ? BEAT * 0.08 : 0), musicBus);
     for (let k = 0; k < 6; k++) noise(0.01, 0.05, 'highpass', 3000, at + Math.random() * BEAT * 4, musicBus); // vinyl crackle
   }
+  function startAmbience() {
+    if (!ctx || ambOn || !musicBus) return;
+    ambOn = true;
+    if (!noiseBuf) { noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 240;
+    const g = ctx.createGain(); g.gain.value = 0.035;
+    src.connect(f); f.connect(g); g.connect(musicBus); src.start();
+    const lfo = ctx.createOscillator(), lg = ctx.createGain();
+    lfo.frequency.value = 0.07; lg.gain.value = 90; lfo.connect(lg); lg.connect(f.frequency); lfo.start();
+    const o = ctx.createOscillator(), og = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 58; og.gain.value = 0.016;
+    o.connect(og); og.connect(musicBus); o.start();
+  }
   function startMusic() {
-    if (!ctx || musicOn) return;
+    if (!ctx) return;
+    startAmbience();
+    if (musicOn) return;
     musicOn = true; nextBar = ctx.currentTime + 0.1;
     timer = setInterval(() => {
       if (ctx.state !== 'running') { init(); return; }

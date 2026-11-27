@@ -347,34 +347,113 @@ function applyHuman(r: Rider) {
   r.aim = null;
 }
 
+function ticksToShrink(sim: Sim): number {
+  const width = sim.maxX - sim.minX + 1;
+  const height = sim.maxY - sim.minY + 1;
+  if (width <= 11 || height <= 15) return 1e9;
+  if (sim.tick < sim.wallAt) return sim.wallAt - sim.tick;
+  const rem = (sim.tick - sim.wallAt) % sim.wallEvery;
+  return rem === 0 ? sim.wallEvery : sim.wallEvery - rem;
+}
+
 function decide(sim: Sim, rider: Rider): number {
-  if (rider.skill === "novice" && sim.tick % 3 !== 0) {
+  const expert = rider.skill === "expert";
+  if (!expert && sim.tick % 3 !== 0) {
     const nx = rider.x + DX[rider.dir]!;
     const ny = rider.y + DY[rider.dir]!;
     if (!occupied(sim, nx, ny)) return rider.dir;
   }
+  const cap = expert ? 400 : 80;
   const options = [0, 1, 2, 3].filter((d) => d !== (rider.dir + 2) % 4);
+
+  let target: Rider | undefined;
+  let tDist = 1e9;
+  for (const o of sim.riders) {
+    if (!o.alive || o === rider) continue;
+    const dist = Math.abs(o.x - rider.x) + Math.abs(o.y - rider.y);
+    if (o.human) {
+      if (!target?.human || dist < tDist) { target = o; tDist = dist; }
+    } else if (!target?.human && dist < tDist) {
+      target = o; tDist = dist;
+    }
+  }
+
+  const shrink = ticksToShrink(sim);
+  const inset = shrink <= 12 ? 1 : 0;
+  let oppSpace = 0, tx = rider.x, ty = rider.y;
+  if (target) {
+    const fx = target.x + DX[target.dir]!, fy = target.y + DY[target.dir]!;
+    if (!occupied(sim, fx, fy)) {
+      tx = fx; ty = fy;
+      oppSpace = flood(sim, fx, fy, cap, inset);
+    } else {
+      for (let d = 0; d < 4; d++) {
+        const ax = target.x + DX[d]!, ay = target.y + DY[d]!;
+        if (!occupied(sim, ax, ay)) {
+          tx = ax; ty = ay;
+          oppSpace = flood(sim, ax, ay, cap, inset);
+          break;
+        }
+      }
+    }
+  }
+
+  const onEdge = (x: number, y: number) => x === sim.minX || x === sim.maxX || y === sim.minY || y === sim.maxY;
+  const spaceAt = [-1, -1, -1, -1];
+  const afterAt = [-1, -1, -1, -1];
+  let maxSpace = 0;
+  for (const d of options) {
+    const nx = rider.x + DX[d]!, ny = rider.y + DY[d]!;
+    if (occupied(sim, nx, ny)) continue;
+    if (shrink <= 2 && onEdge(nx, ny)) continue;
+    const space = flood(sim, nx, ny, cap, 0);
+    spaceAt[d] = space;
+    if (space > maxSpace) maxSpace = space;
+    if (shrink <= 12) afterAt[d] = onEdge(nx, ny) ? 0 : flood(sim, nx, ny, cap, 1);
+  }
+
   let best = rider.dir;
   let bestScore = -1e9;
   for (const d of options) {
-    const nx = rider.x + DX[d]!;
-    const ny = rider.y + DY[d]!;
+    const nx = rider.x + DX[d]!, ny = rider.y + DY[d]!;
     let score: number;
-    if (occupied(sim, nx, ny)) score = -100000;
+    if (spaceAt[d] < 0) score = -100000;
     else {
-      const space = flood(sim, nx, ny, rider.skill === "expert" ? 420 : 70);
-      const ray = openRay(sim, nx, ny, d);
-      score = space + ray * 4;
-      if (d === rider.dir) score += rider.skill === "expert" ? 10 : 24;
-      score += sim.rng() * (rider.skill === "expert" ? 12 : 55);
+      const space = spaceAt[d];
+      const after = shrink <= 12 ? (onEdge(nx, ny) ? 0 : Math.max(0, afterAt[d])) : space;
+      score = after * 3 + space + openRay(sim, nx, ny, d);
+      if (maxSpace >= 20 && space < maxSpace * 0.55) score -= (maxSpace - space) * 8;
+      if (space < 8) score -= (8 - space) * 40;
+      let exits = 0, hug = 0;
+      for (let e = 0; e < 4; e++) {
+        const ax = nx + DX[e]!, ay = ny + DY[e]!;
+        if (!occupied(sim, ax, ay)) exits++;
+        if (ax < sim.minX || ay < sim.minY || ax > sim.maxX || ay > sim.maxY || cell(sim, ax, ay) === 255) hug++;
+      }
+      if (exits === 0) score -= 20000;
+      if (space >= cap * 0.5 && shrink > 12) score += hug * 14;
+      if (shrink <= 12) {
+        const depth = Math.min(nx - sim.minX, sim.maxX - nx, ny - sim.minY, sim.maxY - ny);
+        score -= Math.abs(depth - 1) * 18;
+      }
+      if (d === rider.dir) score += expert ? 8 : 24;
+      score += sim.rng() * (expert ? 10 : 55);
+      for (const o of sim.riders) {
+        if (!o.alive || o === rider) continue;
+        const hx = o.x + DX[o.dir]!, hy = o.y + DY[o.dir]!;
+        if (nx === hx && ny === hy) score -= 90000;
+        else if (Math.abs(nx - o.x) + Math.abs(ny - o.y) === 1) score -= 2200;
+      }
+      if (shrink <= 2 && onEdge(rider.x, rider.y) && !onEdge(nx, ny)) score += 4000;
+      if (target && after > oppSpace + 6 && space > 12 && (space < cap || oppSpace < cap)) {
+        const dist = Math.abs(nx - tx) + Math.abs(ny - ty);
+        score += (30 - Math.min(dist, 30)) * 1.5;
+      }
     }
-    if (score > bestScore) {
-      bestScore = score;
-      best = d;
-    }
+    if (score > bestScore) { bestScore = score; best = d; }
   }
-  if (rider.skill === "novice" && sim.rng() < 0.1) {
-    const risky = options.find((d) => d !== best && !occupied(sim, rider.x + DX[d]!, rider.y + DY[d]!));
+  if (!expert && sim.rng() < 0.1) {
+    const risky = options.find((d) => d !== best && spaceAt[d] >= 0);
     if (risky !== undefined) return risky;
   }
   return best;
@@ -383,7 +462,10 @@ function decide(sim: Sim, rider: Rider): number {
 let seen = new Uint8Array(0);
 const stack: number[] = [];
 
-function flood(sim: Sim, sx: number, sy: number, limit: number): number {
+function flood(sim: Sim, sx: number, sy: number, limit: number, inset = 0): number {
+  if (sx < sim.minX + inset || sy < sim.minY + inset || sx > sim.maxX - inset || sy > sim.maxY - inset) return 0;
+  if (cell(sim, sx, sy) !== 0) return 0;
+  for (const r of sim.riders) if (r.alive && r.x === sx && r.y === sy) return 0;
   const n = sim.cols * sim.rows;
   if (seen.length < n) seen = new Uint8Array(n);
   else seen.fill(0);
@@ -400,7 +482,11 @@ function flood(sim: Sim, sx: number, sy: number, limit: number): number {
     for (let d = 0; d < 4; d++) {
       const nx = x + DX[d]!;
       const ny = y + DY[d]!;
-      if (occupied(sim, nx, ny)) continue;
+      if (nx < sim.minX + inset || ny < sim.minY + inset || nx > sim.maxX - inset || ny > sim.maxY - inset) continue;
+      if (cell(sim, nx, ny) !== 0) continue;
+      let hit = false;
+      for (const r of sim.riders) if (r.alive && r.x === nx && r.y === ny) { hit = true; break; }
+      if (hit) continue;
       const ni = ny * sim.cols + nx;
       if (seen[ni]) continue;
       seen[ni] = 1;

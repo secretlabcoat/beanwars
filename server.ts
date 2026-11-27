@@ -118,7 +118,7 @@ function startMatch() {
     const free = BEANS.findIndex((_, i) => i + 1 !== list[0]!.id);
     list.push({ id: free + 1, name: "AI " + BEANS[free]!.name, ai: true });
   }
-  sim = createMatch({ cols: COLS, rows: ROWS, players: list, skill: "novice", rounds: ROUNDS });
+  sim = createMatch({ cols: COLS, rows: ROWS, players: list, skill: "expert", rounds: ROUNDS });
   wait = 3 * TICK_HZ;
   timer = setInterval(tick, 1000 / TICK_HZ);
   lobby();
