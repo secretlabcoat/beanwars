@@ -75,6 +75,11 @@ body.ingame #app .wincard,body.ingame #app .wincard *{pointer-events:auto}
 body.won #pad,body.won.ingame.player #pad{display:none!important}
 body.won #mute,body.won.ingame #mute{display:none!important}
 body.lobby h1,body.lobby .inroom,body.lobby .player-list,body.lobby .player-item,body.lobby #app>div{text-shadow:0 2px 8px #000,0 0 14px rgba(0,0,0,.8)}
+.rounds{display:flex;align-items:center;justify-content:center;gap:.35rem;flex-wrap:wrap;margin:.35rem 0 .15rem}
+.rounds .lab{font-size:.95rem;color:#cde;margin-right:.15rem}
+.rounds button{min-width:48px;width:48px;min-height:44px;padding:0;margin:0;font-weight:600}
+.rounds button.on{background:linear-gradient(90deg,#4c7bff,#ff5fd2);border:0;box-shadow:0 0 16px rgba(255,95,210,.4)}
+.rounds-read{font-size:1.05rem;color:#dde;margin:.3rem 0}
 </style>
 </head>
 <body>
@@ -422,7 +427,19 @@ body.lobby h1,body.lobby .inroom,body.lobby .player-list,body.lobby .player-item
         title.style.color=BEANS[you.bean].color;
         app.appendChild(title);
         app.appendChild(playerList());
+        const ROPTS=[1,3,5,7];
+        const cur=ROPTS.includes(lobby.rounds)?lobby.rounds:3;
         if (youId===adminId) {
+            const row=document.createElement('div'); row.className='rounds';
+            const lab=document.createElement('span'); lab.className='lab'; lab.textContent='Rounds'; row.appendChild(lab);
+            ROPTS.forEach(n=>{
+                const b=document.createElement('button'); b.textContent=String(n);
+                if (n===cur) b.className='on';
+                b.setAttribute('aria-label', n+' rounds');
+                b.onclick=()=>{ if (n!==cur) send({t:'rounds',n}); };
+                row.appendChild(b);
+            });
+            app.appendChild(row);
             const startBtn=document.createElement('button');
             startBtn.className='big';
             startBtn.textContent='Start';
@@ -434,6 +451,7 @@ body.lobby h1,body.lobby .inroom,body.lobby .player-list,body.lobby .player-item
             note.textContent='Start now or wait for more players. If you start alone, an AI bean joins.';
             app.appendChild(note);
         } else {
+            const rd=document.createElement('div'); rd.className='rounds-read'; rd.textContent='Rounds: '+cur; app.appendChild(rd);
             const wait=document.createElement('div');
             wait.textContent='Waiting for the admin to start';
             wait.style.fontSize='1.1rem';

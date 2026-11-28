@@ -7,7 +7,9 @@ import { BEANS, TICK_HZ, createMatch, resetRound, step, pushTurn, aimHuman, type
 
 const PORT = Number(process.env.PORT || 10000);
 const PUB = path.join(import.meta.dirname, "public");
-const COLS = 40, ROWS = 56, ROUNDS = 3;
+const COLS = 40, ROWS = 56;
+const ROUNDS_OPTS = [1, 3, 5, 7];
+let rounds = 3;
 
 type Client = { ws: WebSocket; id: number | null; order: number; name: string };
 const clients = new Set<Client>();
@@ -72,7 +74,7 @@ const players = () => [...clients].filter((c) => c.id !== null).sort((a, b) => a
 
 function lobby() {
   const ps = players().map((c) => ({ id: c.id, bean: c.id! - 1, name: c.name }));
-  for (const c of clients) send(c, { t: "lobby", you: c.id, admin, players: ps, phase: sim ? "playing" : "lobby" });
+  for (const c of clients) send(c, { t: "lobby", you: c.id, admin, players: ps, phase: sim ? "playing" : "lobby", rounds });
 }
 
 function fixAdmin() {
@@ -120,7 +122,7 @@ function startMatch() {
     const pick = free[Math.floor(Math.random() * free.length)] ?? 0;
     list.push({ id: pick + 1, name: "AI " + BEANS[pick]!.name, ai: true });
   }
-  sim = createMatch({ cols: COLS, rows: ROWS, players: list, skill: "expert", rounds: ROUNDS });
+  sim = createMatch({ cols: COLS, rows: ROWS, players: list, skill: "expert", rounds });
   wait = 3 * TICK_HZ;
   timer = setInterval(tick, 1000 / TICK_HZ);
   lobby();
@@ -150,6 +152,10 @@ wss.on("connection", (ws) => {
     } else if (m.t === "leave" && c.id !== null && !sim) {
       c.id = null; fixAdmin(); lobby();
     } else if (m.t === "start" && c.id !== null && c.id === admin) startMatch();
+    else if (m.t === "rounds" && c.id !== null && c.id === admin && !sim) {
+      const n = Number(m.n);
+      if (ROUNDS_OPTS.includes(n)) { rounds = n; lobby(); }
+    }
     else if (m.t === "turn" && sim && c.id !== null && (m.d === 1 || m.d === -1)) pushTurn(sim, c.id, m.d);
     else if (m.t === "aim" && sim && c.id !== null) aimHuman(sim, c.id, Number(m.dir));
   });
