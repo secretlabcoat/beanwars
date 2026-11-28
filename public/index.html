@@ -16,14 +16,16 @@ h1{font-size:3rem;margin:0.5rem}
 .top-bar{position:absolute;top:0;left:0;width:100%;padding:0.5rem;background:rgba(0,0,0,0.5);display:flex;flex-wrap:wrap;justify-content:center;gap:0.5rem;font-size:0.9rem;z-index:2}
 .overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2rem;pointer-events:none;z-index:2}
 .hint{position:absolute;top:calc(100% - 2rem);left:50%;transform:translateX(-50%);font-size:0.9rem;color:#aaa;z-index:2}
-canvas{position:fixed;top:0;left:0;width:100%;height:100%;touch-action:none;z-index:0;display:none}
+#gameCanvas{position:fixed;top:0;left:0;width:100%;height:100%;touch-action:none;z-index:0;display:none}
+#pileCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:none}
+body.lobby #pileCanvas{display:block}
 #app{z-index:1}
 #pad{position:fixed;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));display:none;justify-content:space-between;padding:0 16px;z-index:3;pointer-events:none}
 #pad button{pointer-events:auto;min-width:64px;width:64px;min-height:52px;height:52px;padding:0;font-size:1.3rem;touch-action:none;margin:0}
 body.ingame.player #pad{display:flex}
 .hint{display:none}
 body.ingame #app{pointer-events:none}
-body.ingame canvas{display:block}
+body.ingame #gameCanvas{display:block}
 .connecting{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.5rem;color:#aaa;z-index:3}
 button{min-height:52px;min-width:120px;font-size:1.2rem;padding:0 1.4rem;margin:0.5rem;border-radius:14px;border:1px solid rgba(120,170,255,.35);background:linear-gradient(180deg,#2e3a5e,#1a2034);color:#fff;cursor:pointer;box-shadow:0 0 14px rgba(76,123,255,.28),inset 0 1px 0 rgba(255,255,255,.14);transition:transform .1s,filter .1s,box-shadow .1s}
 button:hover{filter:brightness(1.12);box-shadow:0 0 20px rgba(76,123,255,.5)}
@@ -72,12 +74,14 @@ body.top{background:#05030f}
 body.ingame #app .wincard,body.ingame #app .wincard *{pointer-events:auto}
 body.won #pad,body.won.ingame.player #pad{display:none!important}
 body.won #mute,body.won.ingame #mute{display:none!important}
+body.lobby h1,body.lobby .inroom,body.lobby .player-list,body.lobby .player-item,body.lobby #app>div{text-shadow:0 2px 8px #000,0 0 14px rgba(0,0,0,.8)}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <div class="connecting" id="connecting">Connecting...</div>
 <canvas id="gameCanvas"></canvas>
+<canvas id="pileCanvas"></canvas>
 <div id="pad"><button id="tl" aria-label="Turn left">&#9664;</button><button id="tr" aria-label="Turn right">&#9654;</button></div>
 <button id="mute" aria-label="Sound">&#128266;</button>
 <script src="/audio.js"></script>
@@ -108,6 +112,110 @@ body.won #mute,body.won.ingame #mute{display:none!important}
     let winHold=false, winDismissed=false, winRecipe=null, winBean=0;
     const BIMG = BEANS.map(b=>{ const i=new Image(); i.src='/beans/'+b.name.toLowerCase()+'.png'; return i; });
     function beanImg(i,size){ const im=document.createElement('img'); im.src='/beans/'+BEANS[i].name.toLowerCase()+'.png'; im.alt=BEANS[i].name; im.className='beanimg'; im.style.width=size+'px'; im.style.height=size+'px'; return im; }
+    const BWPile = (() => {
+        const el = document.getElementById('pileCanvas');
+        const ctx = el.getContext('2d', { alpha: true });
+        const frozen = document.createElement('canvas');
+        const fctx = frozen.getContext('2d');
+        const MAX = 300, G = 2200;
+        let on = false, raf = 0, t0 = 0, nextSpawn = 0, frozenN = 0;
+        let W = 0, H = 0, dpr = 1, surf = null, live = [];
+        function drawBean(c, b) {
+            c.save(); c.translate(b.x, b.y); c.rotate(b.rot);
+            if (b.im && b.im.complete && b.im.naturalWidth) c.drawImage(b.im, -b.w/2, -b.h/2, b.w, b.h);
+            else { c.fillStyle = b.col; c.beginPath(); c.ellipse(0, 0, b.w*0.45, b.h*0.35, 0, 0, Math.PI*2); c.fill(); }
+            c.restore();
+        }
+        function at(x) { return surf[Math.max(0, Math.min(W-1, x|0))]; }
+        function size() {
+            const w = window.innerWidth, h = window.innerHeight;
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            W = w; H = h;
+            el.width = frozen.width = (w * dpr) | 0;
+            el.height = frozen.height = (h * dpr) | 0;
+            el.style.width = w + 'px'; el.style.height = h + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            surf = new Float32Array(W); surf.fill(H - 4);
+            live.length = 0; frozenN = 0;
+            fctx.clearRect(0, 0, W, H); ctx.clearRect(0, 0, W, H);
+        }
+        function stamp(b) {
+            drawBean(fctx, b);
+            const rx = b.w * 0.48, ry = b.h * 0.38;
+            const x0 = Math.max(0, (b.x - rx) | 0), x1 = Math.min(W - 1, (b.x + rx) | 0);
+            for (let x = x0; x <= x1; x++) {
+                const n = (x - b.x) / rx;
+                const top = b.y - ry * Math.sqrt(Math.max(0, 1 - n * n));
+                if (top < surf[x]) surf[x] = top;
+            }
+            frozenN++;
+        }
+        function spawn() {
+            if (frozenN + live.length >= MAX || live.length >= 32) return;
+            const i = (Math.random() * 8) | 0;
+            const s = 0.22 + Math.random() * 0.1;
+            const w = 128 * s, h = 128 * s;
+            live.push({
+                x: 18 + Math.random() * Math.max(1, W - 36), y: -24 - Math.random() * 70,
+                vx: (Math.random() - 0.5) * 70, vy: 30 + Math.random() * 90,
+                rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 5,
+                w, h, r: Math.min(w, h) * 0.36, im: BIMG[i], col: BEANS[i].color
+            });
+        }
+        function step(dt) {
+            for (let i = live.length - 1; i >= 0; i--) {
+                const b = live[i];
+                b.vy += G * dt; b.vx *= 0.995;
+                b.x += b.vx * dt; b.y += b.vy * dt; b.rot += b.vr * dt;
+                if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * 0.4; }
+                if (b.x > W - b.r) { b.x = W - b.r; b.vx = -Math.abs(b.vx) * 0.4; }
+                const sy = Math.min(at(b.x), at(b.x - b.r * 0.65), at(b.x + b.r * 0.65));
+                if (b.y + b.r >= sy) {
+                    const sl = at(b.x + 3) - at(b.x - 3);
+                    b.y = sy - b.r;
+                    if (b.vy > 130) {
+                        b.vy *= -0.24; b.vx = b.vx * 0.65 + sl * 10 + (Math.random() - 0.5) * 18;
+                        b.vr += (Math.random() - 0.5) * 6;
+                    } else {
+                        stamp(b); live.splice(i, 1);
+                    }
+                }
+            }
+        }
+        function frame(now) {
+            if (!on) return;
+            if (!t0) t0 = now;
+            const dt = Math.min(0.032, (now - t0) / 1000);
+            t0 = now;
+            if (frozenN < MAX && now >= nextSpawn) {
+                spawn();
+                nextSpawn = now + 250 + Math.random() * 250;
+            }
+            step(dt);
+            ctx.clearRect(0, 0, W, H);
+            ctx.drawImage(frozen, 0, 0, W, H);
+            for (let i = 0; i < live.length; i++) drawBean(ctx, live[i]);
+            raf = requestAnimationFrame(frame);
+        }
+        function onResize() { if (on) size(); }
+        return {
+            start() {
+                if (on) return;
+                on = true; t0 = 0; nextSpawn = 0; size();
+                window.addEventListener('resize', onResize);
+                raf = requestAnimationFrame(frame);
+            },
+            stop() {
+                if (!on && !frozenN && !live.length) return;
+                on = false;
+                if (raf) cancelAnimationFrame(raf);
+                raf = 0; t0 = 0; live.length = 0; frozenN = 0;
+                window.removeEventListener('resize', onResize);
+                if (W) { fctx.clearRect(0, 0, W, H); ctx.clearRect(0, 0, W, H); if (surf) surf.fill(H - 4); }
+            }
+        };
+    })();
     // ---------- WebSocket ----------
     function connect() {
         const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -185,6 +293,8 @@ body.won #mute,body.won.ingame #mute{display:none!important}
         else if (screen==='game') renderGame();
         else if (screen==='top') renderTop();
         document.body.classList.toggle('home', screen==='home');
+        document.body.classList.toggle('lobby', screen==='lobby');
+        if (screen==='lobby') BWPile.start(); else BWPile.stop();
         const ni=document.getElementById('nameIn'); if (ni && refocus) { ni.focus(); ni.setSelectionRange(caret,caret); }
     }
     function label(p){ return (p.name||BEANS[p.bean].name) + ' (' + BEANS[p.bean].name + ')'; }
@@ -316,7 +426,7 @@ body.won #mute,body.won.ingame #mute{display:none!important}
             const startBtn=document.createElement('button');
             startBtn.className='big';
             startBtn.textContent='Start';
-            startBtn.onclick=()=>{ send({t:'start'}); };
+            startBtn.onclick=()=>{ BWPile.stop(); send({t:'start'}); };
             app.appendChild(startBtn);
             const note=document.createElement('div');
             note.style.fontSize='0.9rem';
